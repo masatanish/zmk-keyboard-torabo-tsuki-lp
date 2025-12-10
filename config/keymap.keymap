@@ -22,7 +22,7 @@
             bindings = <
 &none                  &none      &none     &none     &none        &none                                   &none            &none  &none      &none     &none                 &none
 &kp TAB                &kp Q      &kp W     &kp E     &kp R        &kp T                                   &kp Y            &kp U  &kp I      &kp O     &kp P                 &kp MINUS
-&kp LEFT_CONTROL       &kp A      &kp S     &kp D     &kp F        &kp G           &none        &none      &kp H            &kp J  &kp K      &kp L     &kp SEMI              &kp SQT
+&kp LEFT_CONTROL       &kp A      &kp S     &kp D     &kp F        &kp G           &none        &none      &kp H            &kp J  &kp K      &kp L     &lt 3 SEMICOLON       &lt 2 SQT
 &mt LEFT_SHIFT ESCAPE  &kp Z      &kp X     &kp C     &kp V        &kp B           &mkp LCLK    &mkp RCLK  &kp N            &kp M  &kp COMMA  &kp DOT   &mt RIGHT_SHIFT FSLH  &kp BACKSLASH
 &kp ESCAPE             &kp LCTRL  &kp LGUI  &kp LALT  &lt 2 LANG2  &mt LCMD LANG1  &lt 3 SPACE  &kp SPACE  &lt 1 BACKSPACE  &none  &none      &kp RGUI  &kp LS(LA(LC(N4)))    &kp RIGHT_SHIFT
             >;
