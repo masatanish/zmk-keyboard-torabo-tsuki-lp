@@ -4,4 +4,11 @@
 
 &trackball_listener {
     input-processors = <&zip_xy_transform (INPUT_TRANSFORM_X_INVERT | INPUT_TRANSFORM_Y_INVERT)>;
+
+    scroll_layer {
+        layers = <4>;
+        input-processors = <&zip_xy_to_scroll_mapper
+                            &zip_scroll_scaler 3 5
+                            &zip_scroll_transform (INPUT_TRANSFORM_X_INVERT | INPUT_TRANSFORM_Y_INVERT)>;
+    };
 };
