@@ -5,6 +5,17 @@
 #include <dt-bindings/zmk/pointing.h>
 
 / {
+    behaviors {
+        lt_bspc: layer_tap_bspc {
+            compatible = "zmk,behavior-hold-tap";
+            #binding-cells = <2>;
+            flavor = "tap-preferred";
+            tapping-term-ms = <300>;
+            quick-tap-ms = <200>;
+            bindings = <&mo>, <&kp>;
+        };
+    };
+
     combos {
         compatible = "zmk,combos";
 
@@ -24,7 +35,7 @@
 &kp TAB                &kp Q      &kp W     &kp E     &kp R             &kp T                                   &kp Y       &kp U  &kp I      &kp O    &kp P            &kp MINUS
 &kp LEFT_CONTROL       &kp A      &kp S     &kp D     &kp F             &kp G           &none        &none      &kp H       &kp J  &kp K      &kp L    &lt 4 SEMICOLON  &lt 2 SQT
 &mt LEFT_SHIFT ESCAPE  &kp Z      &kp X     &kp C     &kp V             &kp B           &kp END      &kp HOME   &kp N       &kp M  &kp COMMA  &kp DOT  &kp SLASH        &kp BACKSLASH
-&kp ESCAPE             &kp LCTRL  &kp LGUI  &kp LALT  &lt 2 LANGUAGE_2  &mt LCMD LANG1  &lt 3 SPACE  &kp ENTER  &lt 2 BSPC  &none  &none      &mo 3    &none            &kp LA(LC(LG(NUMBER_4)))
+&kp ESCAPE             &kp LCTRL  &kp LGUI  &kp LALT  &lt 2 LANGUAGE_2  &mt LCMD LANG1  &lt 3 SPACE  &kp ENTER  &lt_bspc 2 BSPC  &none  &none      &mo 3    &none            &kp LA(LC(LG(NUMBER_4)))
             >;
         };
 
