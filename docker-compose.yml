@@ -1,0 +1,17 @@
+services:
+  zmk-build:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zmk-keyboard-build
+    volumes:
+      - .:/workspace
+      - west-cache:/root/.west
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: tail -f /dev/null
+
+volumes:
+  west-cache:
+

@@ -1,0 +1,7 @@
+build/
+!zephry/modules.yml
+zephyr/
+modules/
+tools/
+bootloader/
+.west/
