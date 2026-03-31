@@ -3,9 +3,9 @@
 #include <dt-bindings/zmk/input_transform.h>
 
 / {
-	chosen {
-		zephyr,console = &snippet_studio_rpc_usb_uart;
-	};
+    chosen {
+        zephyr,console = &snippet_studio_rpc_usb_uart;
+    };
 };
 
 &trackball_listener {
