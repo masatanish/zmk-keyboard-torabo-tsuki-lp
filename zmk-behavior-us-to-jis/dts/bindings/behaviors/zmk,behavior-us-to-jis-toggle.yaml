@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+description: Set US->JIS host conversion mode to on or off (not a toggle of the key)
+compatible: "zmk,behavior-us-to-jis-toggle"
+include: zero_param.yaml
+properties:
+  toggle-mode:
+    type: string
+    required: true
+    enum:
+      - "on"
+      - "off"

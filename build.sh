@@ -87,8 +87,13 @@ build_single() {
         fi
         
         # ビルド実行（studio-rpc-usb-uartスニペットを追加）
-        if [ -f /workspace/zephyr/module.yml ]; then
-            west build -p always -s zmk/app -d ${build_dir} -b ${board} -S studio-rpc-usb-uart -- -DZMK_CONFIG=/workspace/config -DZMK_EXTRA_MODULES=/workspace -DSHIELD=${shield} ${cmake_args} || BUILD_ERROR=\$?
+        if [ -d /workspace/zmk-behavior-us-to-jis ] || [ -f /workspace/zephyr/module.yml ]; then
+            # 値に ; が入るため二重引用符は使わない（ホストの "..." 内で文が切れてしまう）
+            zmk_extras='/workspace'
+            if [ -d /workspace/zmk-behavior-us-to-jis ]; then
+                zmk_extras='/workspace;/workspace/zmk-behavior-us-to-jis'
+            fi
+            west build -p always -s zmk/app -d ${build_dir} -b ${board} -S studio-rpc-usb-uart -- -DZMK_CONFIG=/workspace/config -DZMK_EXTRA_MODULES=\"\${zmk_extras}\" -DSHIELD=${shield} ${cmake_args} || BUILD_ERROR=\$?
         else
             west build -p always -s zmk/app -d ${build_dir} -b ${board} -S studio-rpc-usb-uart -- -DZMK_CONFIG=/workspace/config -DSHIELD=${shield} ${cmake_args} || BUILD_ERROR=\$?
         fi

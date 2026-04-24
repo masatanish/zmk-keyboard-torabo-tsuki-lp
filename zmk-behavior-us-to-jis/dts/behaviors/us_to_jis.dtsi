@@ -1,0 +1,17 @@
+#include <dt-bindings/zmk/behaviors.h>
+
+/ {
+    behaviors {
+        /omit-if-no-ref/ u2j_on: u2j_on {
+            compatible = "zmk,behavior-us-to-jis-toggle";
+            #binding-cells = <0>;
+            toggle-mode = "on";
+        };
+
+        /omit-if-no-ref/ u2j_off: u2j_off {
+            compatible = "zmk,behavior-us-to-jis-toggle";
+            #binding-cells = <0>;
+            toggle-mode = "off";
+        };
+    };
+};

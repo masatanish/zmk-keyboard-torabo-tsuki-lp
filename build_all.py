@@ -54,8 +54,13 @@ def build_firmware(board, shield, snippet=None, cmake_args=None, artifact_name=N
         # ZMK_CONFIGを指定（ユーザー設定ディレクトリ）
         # zephyr/module.ymlが存在する場合は、ZMK_EXTRA_MODULESも指定
         cmake_args_list = [f"-DZMK_CONFIG=/workspace/config"]
-        if os.path.exists("/workspace/zephyr/module.yml"):
-            cmake_args_list.append(f"-DZMK_EXTRA_MODULES=/workspace")
+        if os.path.exists("/workspace/zephyr/module.yml") or os.path.isdir(
+            "/workspace/zmk-behavior-us-to-jis"
+        ):
+            zmk_extras = "/workspace"
+            if os.path.isdir("/workspace/zmk-behavior-us-to-jis"):
+                zmk_extras = "/workspace;/workspace/zmk-behavior-us-to-jis"
+            cmake_args_list.append(f"-DZMK_EXTRA_MODULES={zmk_extras}")
         cmake_args_list.append(f"-DSHIELD={shield}")
         
         # cmake-argsの追加
