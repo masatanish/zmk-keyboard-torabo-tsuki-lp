@@ -12,9 +12,8 @@
 #include <zephyr/logging/log.h>
 #include <zmk/event_manager.h>
 #include <zmk/events/keycode_state_changed.h>
-#include <zmk/events/modifiers_state_changed.h>
 #include <zmk/behavior_us_to_jis.h>
-#include <dt-bindings/zmk/keys.h>
+#include <zmk/hid.h>
 #include <dt-bindings/zmk/hid_usage.h>
 #include <dt-bindings/zmk/hid_usage_pages.h>
 #include <dt-bindings/zmk/modifiers.h>
@@ -26,8 +25,8 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
  * zmk_event_manager_raise() is synchronous, so a simple static guard works.
  */
 static bool us_to_jis_reraising;
-static uint8_t swallowed_release[256];
-static zmk_mod_flags_t active_shift_mods;
+static uint8_t masked_shift_by_key[256];
+static uint8_t masked_shift_active_count;
 
 struct us2jis_row {
     uint16_t from;
@@ -63,7 +62,7 @@ static const struct us2jis_row us2jis_table[] = {
     {HID_USAGE_KEY_KEYBOARD_EQUAL_AND_PLUS, false, HID_USAGE_KEY_KEYBOARD_MINUS_AND_UNDERSCORE, true},
     /* KC_BSLS -> JP_BSLS */
     {HID_USAGE_KEY_KEYBOARD_BACKSLASH_AND_PIPE, false,
-     HID_USAGE_KEY_KEYBOARD_NON_US_BACKSLASH_AND_PIPE, false},
+     HID_USAGE_KEY_KEYBOARD_INTERNATIONAL1, false},
     /* KC_QUOT -> JP_QUOT */
     {HID_USAGE_KEY_KEYBOARD_APOSTROPHE_AND_QUOTE, false, HID_USAGE_KEY_KEYBOARD_7_AND_AMPERSAND,
      true},
@@ -77,7 +76,7 @@ static const struct us2jis_row us2jis_table[] = {
      false},
     /* KC_UNDS -> JP_UNDS */
     {HID_USAGE_KEY_KEYBOARD_MINUS_AND_UNDERSCORE, true,
-     HID_USAGE_KEY_KEYBOARD_NON_US_BACKSLASH_AND_PIPE, true},
+     HID_USAGE_KEY_KEYBOARD_INTERNATIONAL1, true},
     /* KC_PIPE -> JP_PIPE */
     {HID_USAGE_KEY_KEYBOARD_BACKSLASH_AND_PIPE, true,
      HID_USAGE_KEY_KEYBOARD_INTERNATIONAL3, true},
@@ -113,51 +112,7 @@ static void apply_target_shift(struct zmk_keycode_state_changed *out, bool to_sh
     }
 }
 
-static void raise_encoded(uint32_t encoded, bool pressed, int64_t timestamp) {
-    raise_zmk_keycode_state_changed(
-        zmk_keycode_state_changed_from_encoded(encoded, pressed, timestamp));
-}
-
-/*
- * Only for "physical shift held + target must be unshifted" cases.
- * Temporarily release held shifts, tap converted key, then restore shifts.
- */
-static void tap_with_shift_temporarily_released(uint16_t keycode, zmk_mod_flags_t held_shift,
-                                                int64_t timestamp) {
-    bool lshift_held = (held_shift & MOD_LSFT) != 0;
-    bool rshift_held = (held_shift & MOD_RSFT) != 0;
-
-    if (lshift_held) {
-        raise_encoded(LSHIFT, false, timestamp);
-    }
-    if (rshift_held) {
-        raise_encoded(RSHIFT, false, timestamp);
-    }
-
-    uint32_t encoded = ZMK_HID_USAGE(HID_USAGE_KEY, keycode);
-    raise_encoded(encoded, true, timestamp);
-    raise_encoded(encoded, false, timestamp);
-
-    if (lshift_held) {
-        raise_encoded(LSHIFT, true, timestamp);
-    }
-    if (rshift_held) {
-        raise_encoded(RSHIFT, true, timestamp);
-    }
-}
-
 static int AAA_us_to_jis_keycode(const zmk_event_t *eh) {
-    const struct zmk_modifiers_state_changed *mods_ev = as_zmk_modifiers_state_changed(eh);
-    if (mods_ev != NULL) {
-        zmk_mod_flags_t only_shift = mods_ev->modifiers & (MOD_LSFT | MOD_RSFT);
-        if (mods_ev->state) {
-            active_shift_mods |= only_shift;
-        } else {
-            active_shift_mods &= (zmk_mod_flags_t)~only_shift;
-        }
-        return ZMK_EV_EVENT_BUBBLE;
-    }
-
     if (!zmk_behavior_us_to_jis_is_enabled()) {
         return ZMK_EV_EVENT_BUBBLE;
     }
@@ -180,14 +135,9 @@ static int AAA_us_to_jis_keycode(const zmk_event_t *eh) {
         return ZMK_EV_EVENT_BUBBLE;
     }
 
-    if (!ev->state && ev->keycode < ARRAY_SIZE(swallowed_release) &&
-        swallowed_release[ev->keycode] > 0) {
-        swallowed_release[ev->keycode]--;
-        return ZMK_EV_EVENT_HANDLED;
-    }
-
+    zmk_mod_flags_t physical_shift = zmk_hid_get_explicit_mods() & (MOD_LSFT | MOD_RSFT);
     zmk_mod_flags_t all_mods =
-        (zmk_mod_flags_t)(ev->implicit_modifiers | ev->explicit_modifiers | active_shift_mods);
+        (zmk_mod_flags_t)(ev->implicit_modifiers | ev->explicit_modifiers | physical_shift);
     bool from_shifted = (all_mods & (MOD_LSFT | MOD_RSFT)) != 0;
 
     for (size_t i = 0; i < ARRAY_SIZE(us2jis_table); i++) {
@@ -197,17 +147,35 @@ static int AAA_us_to_jis_keycode(const zmk_event_t *eh) {
         }
 
         us_to_jis_reraising = true;
-        if (ev->state && (active_shift_mods & (MOD_LSFT | MOD_RSFT)) && !m->to_shift) {
-            tap_with_shift_temporarily_released(m->to, active_shift_mods, ev->timestamp);
-            if (ev->keycode < ARRAY_SIZE(swallowed_release) && swallowed_release[ev->keycode] < UINT8_MAX) {
-                swallowed_release[ev->keycode]++;
+        struct zmk_keycode_state_changed out = *ev;
+        out.keycode = m->to;
+        apply_target_shift(&out, m->to_shift, physical_shift);
+
+        if ((physical_shift & (MOD_LSFT | MOD_RSFT)) && !m->to_shift) {
+            if (ev->state) {
+                if (masked_shift_active_count == 0) {
+                    zmk_hid_masked_modifiers_set(physical_shift);
+                }
+                if (ev->keycode < ARRAY_SIZE(masked_shift_by_key) &&
+                    masked_shift_by_key[ev->keycode] < UINT8_MAX) {
+                    masked_shift_by_key[ev->keycode]++;
+                }
+                if (masked_shift_active_count < UINT8_MAX) {
+                    masked_shift_active_count++;
+                }
+            } else if (ev->keycode < ARRAY_SIZE(masked_shift_by_key) &&
+                       masked_shift_by_key[ev->keycode] > 0) {
+                masked_shift_by_key[ev->keycode]--;
+                if (masked_shift_active_count > 0) {
+                    masked_shift_active_count--;
+                }
+                if (masked_shift_active_count == 0) {
+                    zmk_hid_masked_modifiers_clear();
+                }
             }
-        } else {
-            struct zmk_keycode_state_changed out = *ev;
-            out.keycode = m->to;
-            apply_target_shift(&out, m->to_shift, active_shift_mods);
-            raise_zmk_keycode_state_changed(out);
         }
+
+        raise_zmk_keycode_state_changed(out);
         us_to_jis_reraising = false;
         return ZMK_EV_EVENT_HANDLED;
     }
@@ -217,4 +185,3 @@ static int AAA_us_to_jis_keycode(const zmk_event_t *eh) {
 
 ZMK_LISTENER(AAA_us_to_jis, AAA_us_to_jis_keycode);
 ZMK_SUBSCRIPTION(AAA_us_to_jis, zmk_keycode_state_changed);
-ZMK_SUBSCRIPTION(AAA_us_to_jis, zmk_modifiers_state_changed);
